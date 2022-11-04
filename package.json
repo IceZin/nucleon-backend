@@ -4,11 +4,15 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc --build",
+    "start": "node dist/server.js"
   },
   "author": "Victor Hugo Garzo Prado",
   "license": "ISC",
   "dependencies": {
     "ws": "^8.9.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.3"
   }
 }

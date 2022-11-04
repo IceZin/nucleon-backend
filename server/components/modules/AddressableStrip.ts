@@ -1,16 +1,29 @@
-const Module = require("./Module");
+import Session from "../Session";
+import Socket from "../Socket";
+import Module from "./Module";
 
-class AddressableStrip extends Module {
-    #color;
-    #modes;
+type Mode = {
+    code: number;
+    parameters: {
+        [key: string]: {
+            code: number;
+            value: number;
+            min?: number;
+            max?: number;
+        }
+    }
+}
+
+export default class AddressableStrip extends Module {
+    private _color = [0, 0, 0];
+    private _modes: {[key: string]: Mode};
 
     constructor() {
         super();
 
-        this.#color = [0, 0, 0];
-        this.mode = "solid";
+        this._mode = "solid";
 
-        this.#modes = {
+        this._modes = {
             solid: {
                 code: 0x0,
                 parameters: {
@@ -89,28 +102,26 @@ class AddressableStrip extends Module {
             }
         }
 
-        this.actions = {
-            setColor: this.setColor.bind(this),
-            setMode: this.setMode.bind(this),
-            setParameter: this.setParameter.bind(this)
-        }
+        this._actions.set("setColor", this.setColor.bind(this));
+        this._actions.set("setMode", this.setMode.bind(this));
+        this._actions.set("setParameter", this.setParameter.bind(this));
     }
 
-    syncColor(socket) {
+    syncColor(socket: Socket) {
         console.log("[ADDRESSABLE STRIP] Syncing Color");
         socket.sendBuffer([
-            0x2, 0x0, ...this.#color
+            0x2, 0x0, ...this._color
         ])
     }
 
-    setColor(addr, socket, data) {
+    setColor(session: Session, socket: Socket, data: any) {
         if (data.color.length > 3) return;
 
-        this.#color = data.color;
+        this._color = data.color;
 
         this.syncColor(socket);
 
-        this.broadcast([addr], {
+        this.broadcast([session.address], {
             type: "setColor",
             data: {
                 value: data.color
@@ -118,22 +129,22 @@ class AddressableStrip extends Module {
         })
     }
 
-    syncMode(socket) {
+    syncMode(socket: Socket) {
         console.log("[ADDRESSABLE STRIP] Syncing Mode");
         socket.sendBuffer([
-            0x2, 0x1, this.#modes[this.mode].code
+            0x2, 0x1, this._modes[this._mode].code
         ])
     }
 
-    setMode(addr, socket, data) {
+    setMode(session: Session, socket: Socket, data: any) {
         let mode = data.mode;
 
-        if (this.#modes[mode] == undefined) return;
+        if (this._modes[mode] == undefined) return;
 
-        this.mode = mode;
+        this._mode = mode;
         this.syncMode(socket);
 
-        this.broadcast([addr], {
+        this.broadcast([session.address], {
             type: "setMode",
             data: {
                 value: mode
@@ -141,9 +152,9 @@ class AddressableStrip extends Module {
         })
     }
 
-    syncParameter(socket, param) {
+    syncParameter(socket: Socket, param: string) {
         console.log("[ADDRESSABLE STRIP] Syncing Parameter");
-        let parameter = this.#modes[this.mode].parameters[param];
+        let parameter = this._modes[this._mode].parameters[param];
         if (parameter == undefined) return;
 
         socket.sendBuffer([
@@ -151,14 +162,14 @@ class AddressableStrip extends Module {
         ])
     }
 
-    setParameter(addr, socket, data) {
-        let parameter = this.#modes[this.mode].parameters[data.parameter];
+    setParameter(session: Session, socket: Socket, data: any) {
+        let parameter = this._modes[this._mode].parameters[data.parameter];
         if (parameter == undefined) return;
 
-        this.#modes[this.mode].parameters[data.parameter].value = data.value;
+        this._modes[this._mode].parameters[data.parameter].value = data.value;
         this.syncParameter(socket, data.parameter)
 
-        this.broadcast([addr], {
+        this.broadcast([session.address], {
             type: "setParameter",
             data: {
                 parameter: data.parameter,
@@ -167,39 +178,37 @@ class AddressableStrip extends Module {
         })
     }
 
-    syncSession(session) {
-        session.sendJSON({
+    syncSession(session: Session) {
+        session.send({
             type: "setColor",
             data: {
-                value: this.#color
+                value: this._color
             }
         })
 
-        session.sendJSON({
+        session.send({
             type: "setMode",
             data: {
-                value: this.mode
+                value: this._mode
             }
         })
 
-        session.sendJSON({
+        session.send({
             type: "setParameters",
             data: {
-                value: this.#modes[this.mode].parameters
+                value: this._modes[this._mode].parameters
             }
         })
     }
 
-    syncDevice(socket) {
+    syncDevice(socket: Socket) {
         console.log("[ADDRESSABLE STRIP] Syncing Device");
 
         this.syncColor(socket);
         this.syncMode(socket);
 
-        Object.keys(this.#modes[this.mode].parameters).forEach(parameter => {
+        Object.keys(this._modes[this._mode].parameters).forEach(parameter => {
             this.syncParameter(socket, parameter);
         })
     }
 }
-
-module.exports = AddressableStrip;

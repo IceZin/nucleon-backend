@@ -1,14 +1,26 @@
-const Module = require("./Module");
+import Session from "../Session";
+import Socket from "../Socket";
+import Module from "./Module";
 
-class Audio extends Module {
-    #modes;
+type Mode = {
+    code: number;
+    parameters: {
+        [key: string]: {
+            code: number;
+            value: number;
+        }
+    }
+}
+
+export default class Audio extends Module {
+    private _modes: {[key: string]: Mode};
 
     constructor() {
         super();
 
-        this.mode = "audio";
+        this._mode = "audio";
 
-        this.#modes = {
+        this._modes = {
             audio: {
                 code: 0x3,
                 parameters: {
@@ -40,13 +52,11 @@ class Audio extends Module {
             }
         }
 
-        this.actions = {
-            setParameter: this.setParameter.bind(this)
-        }
+        this._actions.set("setParameter", this.setParameter.bind(this));
     }
 
-    syncParameter(socket, param) {
-        let parameter = this.#modes[this.mode].parameters[param];
+    syncParameter(socket: Socket, param: string) {
+        let parameter = this._modes[this._mode].parameters[param];
         if (parameter == undefined) return;
 
         socket.sendBuffer([
@@ -54,14 +64,14 @@ class Audio extends Module {
         ])
     }
 
-    setParameter(addr, socket, data) {
-        let parameter = this.#modes[this.mode].parameters[data.parameter];
+    setParameter(session: Session, socket: Socket, data: any) {
+        let parameter = this._modes[this._mode].parameters[data.parameter];
         if (parameter == undefined) return;
 
-        this.#modes[this.mode].parameters[data.parameter].value = data.value;
+        this._modes[this._mode].parameters[data.parameter].value = data.value;
         this.syncParameter(socket, data.parameter)
 
-        this.broadcast([addr], {
+        this.broadcast([session.address], {
             type: "setParameter",
             data: {
                 parameter: data.parameter,
@@ -70,20 +80,18 @@ class Audio extends Module {
         })
     }
 
-    syncSession(session) {
-        session.sendJSON({
+    syncSession(session: Session) {
+        session.send({
             type: "setParameters",
             data: {
-                value: this.#modes[this.mode].parameters
+                value: this._modes[this._mode].parameters
             }
         })
     }
 
-    syncDevice(socket) {
-        Object.keys(this.#modes[this.mode].parameters).forEach(parameter => {
+    syncDevice(socket: Socket) {
+        Object.keys(this._modes[this._mode].parameters).forEach(parameter => {
             this.syncParameter(socket, parameter);
         })
     }
 }
-
-module.exports = Audio;

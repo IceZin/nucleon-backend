@@ -13,4 +13,9 @@ export default class Endpoint {
   GET(req: IncomingMessage, res: ServerResponse) {
     return;
   }
+
+  @Views.SignedInTest
+  POST(req: string, res: string) {
+    
+  }
 }
