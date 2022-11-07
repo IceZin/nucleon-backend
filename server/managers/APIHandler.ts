@@ -6,15 +6,8 @@ import { parseCookies } from "../components/utils/utils";
 import Endpoint from "./Endpoint";
 import UsersCache from "./Users";
 
-type Cookies = {
-  [key: string]: string;
-}
-
-type Context = (req: IncomingMessage, res: ServerResponse) => boolean;
-
 export default class APIHandler {
   private _paths: Map<string, Endpoint> = new Map();
-  private _upgraders: Map<string, Endpoint> = new Map();
 
   register(url: string, endpoint: Endpoint) {
     if (!this._paths.has(url)) {
@@ -22,24 +15,6 @@ export default class APIHandler {
     } else {
       throw Error("Endpoint already registered on the handler");
     }
-  }
-
-  parseCookies(cookiesRaw: string): Cookies {
-    let cookies = cookiesRaw.split(';');
-    let arr = {} as Cookies;
-
-    cookies.forEach(cookie => {
-      while (cookie.charAt(0) == ' ') {
-          cookie = cookie.substring(1);
-      }
-
-      let ck = cookie.substring(0, cookie.indexOf('='));
-      let ck_val = cookie.substring(cookie.indexOf('=') + 1, cookie.length);
-      
-      arr[ck] = ck_val;
-    });
-
-    return arr;
   }
 
   handleRequest(req: IncomingMessage, res: ServerResponse) {
