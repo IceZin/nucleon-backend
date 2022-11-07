@@ -1,6 +1,10 @@
 import { IncomingMessage, ServerResponse } from "http";
+import internal from "stream";
 import { parse } from "url";
+import WebSocket from "ws";
+import { parseCookies } from "../components/utils/utils";
 import Endpoint from "./Endpoint";
+import UsersCache from "./Users";
 
 type Cookies = {
   [key: string]: string;
@@ -9,21 +13,12 @@ type Cookies = {
 type Context = (req: IncomingMessage, res: ServerResponse) => boolean;
 
 export default class APIHandler {
-  #paths: Map<string, {
-    endpoint: Endpoint,
-    context: Context
-  }>;
+  private _paths: Map<string, Endpoint> = new Map();
+  private _upgraders: Map<string, Endpoint> = new Map();
 
-  constructor() {
-    this.#paths = new Map();
-  }
-
-  register(url: string, endpoint: Endpoint, context: Context) {
-    if (this.#paths.get(url) != undefined) {
-      this.#paths.set(url, {
-        endpoint,
-        context
-      });
+  register(url: string, endpoint: Endpoint) {
+    if (!this._paths.has(url)) {
+      this._paths.set(url, endpoint);
     } else {
       throw Error("Endpoint already registered on the handler");
     }
@@ -47,7 +42,7 @@ export default class APIHandler {
     return arr;
   }
 
-  handleRequest(req: IncomingMessage, res: ServerResponse): boolean {
+  handleRequest(req: IncomingMessage, res: ServerResponse) {
     if (req.url == undefined) {
       return false;
     }
@@ -56,17 +51,34 @@ export default class APIHandler {
     let { pathname, query } = parsedUrl;
 
     if (pathname) {
-      let Path = this.#paths.get(pathname);
-      if (Path?.context(req, res)) {
-        Path.endpoint.handle(req, res);
-        return true;
-      } else {
-        res.statusCode = 401;
-        res.end();
-        return false
-      }
+      let endpoint = this._paths.get(pathname);
+      endpoint?.handle(req, res);
     }
+  }
 
-    return false;
+  handleUpgrade(wss: WebSocket.Server, req: IncomingMessage, sock: internal.Duplex, head: any) {
+    if (req.headers['upgrade'] !== 'websocket') {
+      sock.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+      return;
+    }
+  
+    let cookies = parseCookies(req.headers.cookie || "");
+  
+    if (!cookies) {
+      sock.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+      return;
+    }
+  
+    let user = UsersCache.get(cookies.utoken);
+  
+    if (user) {
+      if (req.url == "/WsClient") {
+        user.handleWebUpgrade(wss, req, sock, head, cookies);
+      } else {
+        user.handleDeviceUpgrade(req, sock, head, cookies);
+      }
+    } else {
+      sock.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+    }
   }
 }

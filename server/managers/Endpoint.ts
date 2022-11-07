@@ -5,17 +5,18 @@ type Method = (req: IncomingMessage, res: ServerResponse) => void;
 
 export default class Endpoint {
   handle(req: IncomingMessage, res: ServerResponse) {
+    if (req.method) {
+      let methodHandler = Object.getOwnPropertyDescriptor(
+        Object.getPrototypeOf(this), req.method
+      )?.value.bind(this);
+
+      if (methodHandler) {
+        methodHandler(req, res);
+        return;
+      }
+    }
+
     res.statusCode = 404;
     res.end();
-  }
-
-  @Views.SignedIn
-  GET(req: IncomingMessage, res: ServerResponse) {
-    return;
-  }
-
-  @Views.SignedInTest
-  POST(req: string, res: string) {
-    
   }
 }

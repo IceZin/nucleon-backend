@@ -17,12 +17,12 @@ export default class Device {
     private user: User;
     private _address: string;
     private _name: string;
-    private _environment: Environment;
+    private _environment: Environment | undefined;
     private _socket: Socket | undefined;
     private _modules: Map<string, AddressableStrip | Audio> = new Map();
     private _sessions: Map<string, Session> = new Map();
 
-    constructor(address: string, name: string, environment: Environment, user: User) {
+    constructor(address: string, name: string, environment: Environment | undefined, user: User) {
         this.user = user;
         this._address = address;
         this._name = name;

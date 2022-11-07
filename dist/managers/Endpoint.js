@@ -1,27 +1,17 @@
 "use strict";
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-const Views_1 = require("./Views");
 class Endpoint {
     handle(req, res) {
+        var _a;
+        if (req.method) {
+            let methodHandler = (_a = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(this), req.method)) === null || _a === void 0 ? void 0 : _a.value.bind(this);
+            if (methodHandler) {
+                methodHandler(req, res);
+                return;
+            }
+        }
         res.statusCode = 404;
         res.end();
     }
-    GET(req, res) {
-        return;
-    }
-    POST(req, res) {
-    }
 }
-__decorate([
-    Views_1.Views.SignedIn
-], Endpoint.prototype, "GET", null);
-__decorate([
-    Views_1.Views.SignedInTest
-], Endpoint.prototype, "POST", null);
 exports.default = Endpoint;

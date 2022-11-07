@@ -1,44 +1,42 @@
 import { IncomingMessage, ServerResponse } from "http";
+import User from "../components/User";
+import { parseCookies } from "../components/utils/utils";
+import UsersCache from "./Users";
 
-type MethodHandler = (req: IncomingMessage, res: ServerResponse) => void;
+type SignedInMethodHandler = (req: IncomingMessage, res: ServerResponse, user: User) => void;
+type NoVerificationMethodHandler = (req: IncomingMessage, res: ServerResponse) => void;
 type Args = [req: IncomingMessage, res: ServerResponse];
-type TestMethodHandler = (req: string, res: string) => void;
 
 export namespace Views {
-  export function SignedIn(target: any, propertyName: string, descriptor: TypedPropertyDescriptor<MethodHandler>) {
+  export function SignedIn(target: any, propertyName: string, descriptor: TypedPropertyDescriptor<SignedInMethodHandler>) {
     let method = descriptor.value!;
 
     descriptor.value = function () {
       let args: Args = Object.values(arguments) as Args;
-      console.log(args[0].)
-      return method.apply(this, args);
+      const cookies = parseCookies(args[0].headers.cookie || "");
+      let user = UsersCache.get(cookies.utoken);
+
+      if (user) {
+        if (user.checkSession(cookies.sessionID)) {
+          return method.apply(this, [...args, user]);
+        }
+      }
+
+      args[1].statusCode = 401;
+      args[1].end();
     };
   }
 
-  export function SignedInTest(target: any, propertyName: string, descriptor: TypedPropertyDescriptor<TestMethodHandler>) {
-    console.log(target);
-    console.log(propertyName);
-    console.log(descriptor);
-    console.log(descriptor.value!)
+  export function Admin(target: any, propertyName: string, descriptor: TypedPropertyDescriptor<SignedInMethodHandler>) {
+    return true;
+  }
 
+  export function NoVerification(target: any, propertyName: string, descriptor: TypedPropertyDescriptor<NoVerificationMethodHandler>) {
     let method = descriptor.value!;
 
     descriptor.value = function () {
-      let args: [req: string, res: string] = Object.values(arguments) as [req: string, res: string];
-      console.log(args);
-      args.forEach((arg) => {
-        if (arg == "Mascaico") console.log("Olha meus irmaunnsss");
-        else console.log(arg);
-      })
+      let args: Args = Object.values(arguments) as Args;
       return method.apply(this, args);
     };
-  }
-
-  export function Admin(target: any, propertyName: string, descriptor: TypedPropertyDescriptor<MethodHandler>) {
-    return true;
-  }
-
-  export function NoVerification(target: any, propertyName: string, descriptor: TypedPropertyDescriptor<MethodHandler>) {
-    return true;
   }
 }

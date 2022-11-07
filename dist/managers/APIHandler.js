@@ -1,29 +1,19 @@
 "use strict";
-var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (receiver, state, value, kind, f) {
-    if (kind === "m") throw new TypeError("Private method is not writable");
-    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a setter");
-    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot write private member to an object whose class did not declare it");
-    return (kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value)), value;
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
 };
-var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (receiver, state, kind, f) {
-    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
-    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
-    return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
-};
-var _APIHandler_paths;
 Object.defineProperty(exports, "__esModule", { value: true });
 const url_1 = require("url");
+const utils_1 = require("../components/utils/utils");
+const Users_1 = __importDefault(require("./Users"));
 class APIHandler {
     constructor() {
-        _APIHandler_paths.set(this, void 0);
-        __classPrivateFieldSet(this, _APIHandler_paths, new Map(), "f");
+        this._paths = new Map();
+        this._upgraders = new Map();
     }
-    register(url, endpoint, context) {
-        if (__classPrivateFieldGet(this, _APIHandler_paths, "f").get(url) != undefined) {
-            __classPrivateFieldGet(this, _APIHandler_paths, "f").set(url, {
-                endpoint,
-                context
-            });
+    register(url, endpoint) {
+        if (!this._paths.has(url)) {
+            this._paths.set(url, endpoint);
         }
         else {
             throw Error("Endpoint already registered on the handler");
@@ -49,19 +39,32 @@ class APIHandler {
         const parsedUrl = (0, url_1.parse)(req.url, true);
         let { pathname, query } = parsedUrl;
         if (pathname) {
-            let Path = __classPrivateFieldGet(this, _APIHandler_paths, "f").get(pathname);
-            if (Path === null || Path === void 0 ? void 0 : Path.context(req, res)) {
-                Path.endpoint.handle(req, res);
-                return true;
+            let endpoint = this._paths.get(pathname);
+            endpoint === null || endpoint === void 0 ? void 0 : endpoint.handle(req, res);
+        }
+    }
+    handleUpgrade(wss, req, sock, head) {
+        if (req.headers['upgrade'] !== 'websocket') {
+            sock.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+            return;
+        }
+        let cookies = (0, utils_1.parseCookies)(req.headers.cookie || "");
+        if (!cookies) {
+            sock.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+            return;
+        }
+        let user = Users_1.default.get(cookies.utoken);
+        if (user) {
+            if (req.url == "/WsClient") {
+                user.handleWebUpgrade(wss, req, sock, head, cookies);
             }
             else {
-                res.statusCode = 401;
-                res.end();
-                return false;
+                user.handleDeviceUpgrade(req, sock, head, cookies);
             }
         }
-        return false;
+        else {
+            sock.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+        }
     }
 }
 exports.default = APIHandler;
-_APIHandler_paths = new WeakMap();

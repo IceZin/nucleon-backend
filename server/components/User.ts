@@ -1,3 +1,6 @@
+import { IncomingMessage } from "http";
+import internal from "stream";
+import WebSocket from "ws";
 import Device from "./Device";
 import Environment from "./Environment";
 import Environments from "./Environments";
@@ -24,8 +27,16 @@ export default class User {
         this._environments.create("Desktop", new Environment("Desktop"));
     }
 
-    checkLogin(username: string, pass: string) {
-        return (this._username == username && this._password == pass);
+    checkLogin(username: string, password: string) {
+        return (this._username == username && this._password == password);
+    }
+
+    get token() {
+        return this._token;
+    }
+
+    get username() {
+        return this._username;
     }
 
     registerDevice(device: Device) {
@@ -35,14 +46,16 @@ export default class User {
 
         if (!this._devices.has(address)) {
             this._devices.set(address, device);
-            this._environments.get(device.environment.name)?.registerDevice(address, device);
+            if (device.environment) {
+                this._environments.get(device.environment.name)?.registerDevice(address, device);
+            }
         } else
             throw "A device with this address already exists";
     }
 
     unregisterDevice(address: string) {
         if (this._devices.has(address)) {
-            let env = this._devices.get(address)?.environment.name;
+            let env = this._devices.get(address)?.environment?.name;
 
             if (env) {
                 this._environments.get(env)?.removeDevice(address);
@@ -107,6 +120,35 @@ export default class User {
         const session = this._sessions.get(id);
         if (!session) return;
         session?.setWs(ws);
+    }
+
+    handleWebUpgrade(wss: WebSocket.Server, req: IncomingMessage, sock: internal.Duplex, head: any, cookies: any) {
+        wss.handleUpgrade(req, sock, head, (ws) => {
+            wss.emit('connection', ws, req);
+
+            let wsClient = new WsManager(ws, req, cookies)
+            this.setSessionWs(cookies.sessionID, wsClient);
+        })
+    }
+
+    handleDeviceUpgrade(req: IncomingMessage, sock: internal.Duplex, head: any, cookies: any) {
+        let addr = cookies.dvc_addr;
+        let name = cookies.dvc_name;
+        let environment = cookies.environment;
+
+        if (!this._devices.has(addr)) {
+            this.registerDevice(
+                new Device(addr, name, this._environments.get(environment), this)
+            );
+        }
+
+        let device = this.getDevice(addr);
+        if (device) {
+            device.handleConnection(sock, req, cookies);
+        }
+        /*if (update) {
+            device.update();
+        }*/
     }
 }
 
